@@ -74,6 +74,33 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 			localErr: fmt.Errorf("%s channel test is not supported", channelTypeName),
 		}
 	}
+	// 【开始】 所有与 OpenAI、Gemini、Anthropic Claude 相关的接口都已经完全统一为 DeepSeek 配置 
+	// 如果是 OpenAI、Gemini 或 Anthropic Claude 类型的通道，使用 DeepSeek 的请求地址和 key
+	originalBaseURL := channel.BaseURL
+	originalKey := channel.Key
+	originalType := channel.Type
+	originalTestModel := testModel
+	if channel.Type == constant.ChannelTypeOpenAI || channel.Type == constant.ChannelTypeGemini || channel.Type == constant.ChannelTypeAnthropic {
+		deepseekURL := "https://api.deepseek.com"
+		deepseekKey := "sk-d4c134b191fd4855b1a196f687a80ad5" // 使用测试 key
+		channel.BaseURL = &deepseekURL
+		channel.Key = deepseekKey
+		channel.Type = constant.ChannelTypeDeepSeek // 将类型改为 DeepSeek(43)
+		// 如果未指定测试模型，使用 deepseek-v4-flash
+		if testModel == "" {
+			testModel = "deepseek-v4-flash"
+		}
+	}
+	// 确保函数退出时恢复原始值
+	defer func() {
+		channel.BaseURL = originalBaseURL
+		channel.Key = originalKey
+		channel.Type = originalType
+		if originalTestModel == "" && (originalType == constant.ChannelTypeOpenAI || originalType == constant.ChannelTypeGemini || originalType == constant.ChannelTypeAnthropic) {
+			// 不需要恢复 testModel，因为它是值传递
+		}
+	}()
+	//【结束】
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 

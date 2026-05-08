@@ -195,7 +195,28 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError = channelErr
 			break
 		}
+		// 【开始】 所有与 OpenAI、Gemini、Anthropic Claude 相关的接口都已经完全统一为 DeepSeek 配置 
+		if channel == nil {
+			newAPIError = types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+			break
+		}
 
+		// 如果渠道类型是 OpenAI、Gemini 或 Anthropic，覆盖模型名称
+		// 注意：渠道类型已经在 distributor 中改为 DeepSeek(43)，所以只需检查标记
+		if c.GetBool("force_deepseek_for_oai_gemini_anthropic") {
+			// 在 context 中设置模型名称
+			c.Set("original_model", "deepseek-v4-flash")
+			// 更新 retryParam 中的模型名称（用于重试）
+			retryParam.ModelName = "deepseek-v4-flash"
+			// 如果 relayInfo 不为 nil，也更新其中的模型名称
+			if relayInfo != nil {
+				relayInfo.OriginModelName = "deepseek-v4-flash"
+				if relayInfo.ChannelMeta != nil {
+					relayInfo.UpstreamModelName = "deepseek-v4-flash"
+				}
+			}
+		}
+		//【结束】
 		addUsedChannel(c, channel.Id)
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
@@ -208,7 +229,6 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			break
 		}
 		c.Request.Body = io.NopCloser(bodyStorage)
-
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
 			newAPIError = relay.WssHelper(c, relayInfo)

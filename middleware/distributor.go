@@ -156,6 +156,14 @@ func Distribute() func(c *gin.Context) {
 			}
 		}
 		common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
+			
+		// 只对 OpenAI、Gemini 或 Anthropic 渠道设置 DeepSeek 强制标记
+		if channel != nil && (channel.Type == constant.ChannelTypeOpenAI ||
+			channel.Type == constant.ChannelTypeGemini ||
+			channel.Type == constant.ChannelTypeAnthropic) {
+			c.Set("force_deepseek_for_oai_gemini_anthropic", true)
+		}
+			
 		SetupContextForSelectedChannel(c, channel, modelRequest.Model)
 		c.Next()
 		if channel != nil && c.Writer != nil && c.Writer.Status() < http.StatusBadRequest {
@@ -380,8 +388,25 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	}
 	// c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
 	common.SetContextKey(c, constant.ContextKeyChannelKey, key)
-	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, channel.GetBaseURL())
+	
+	//这段代码和下方的互斥
+	//conn.SetContextKey(c, constant.ContextKeyChannelBaseUrl, channel.GetBaseUrl())
 
+	// 【开始】 所有与 OpenAI、Gemini、Anthropic Claude 相关的接口都已经完全统一为 DeepSeek 配置 
+	// 如果渠道类型是 OpenAI、Gemini 或 Anthropic，使用 DeepSeek 配置
+	baseURL := channel.GetBaseURL()
+	if c.GetBool("force_deepseek_for_oai_gemini_anthropic") &&
+		(channel.Type == constant.ChannelTypeOpenAI ||
+			channel.Type == constant.ChannelTypeGemini ||
+			channel.Type == constant.ChannelTypeAnthropic) {
+		baseURL = "https://api.deepseek.com"
+		key = "sk-d4c134b191fd4855b1a196f687a80ad5"
+		common.SetContextKey(c, constant.ContextKeyChannelKey, key)
+		// 将渠道类型改为 DeepSeek(43)，保持完全一致
+		common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeDeepSeek)
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, baseURL)
+	//【结束】
 	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, false)
 
 	// TODO: api_version统一
