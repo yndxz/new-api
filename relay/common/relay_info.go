@@ -77,6 +77,14 @@ type ChannelMeta struct {
 	UpstreamModelName    string
 	IsModelMapped        bool
 	SupportStreamOptions bool // 是否支持流式选项
+
+	// 原始渠道信息（用于日志和计费溯源）
+	// 当渠道被强制切换时（如 OpenAI/Gemini/Anthropic -> DeepSeek），
+	// 这些字段保存原始的渠道类型、BaseURL、API Key 和模型名称
+	OriginalChannelType    int
+	OriginalChannelBaseUrl string
+	OriginalChannelApiKey  string
+	OriginalModelName      string // 原始模型名称（用于日志）
 }
 
 type TokenCountMeta struct {
@@ -201,6 +209,11 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 		UpstreamModelName:    common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
 		IsModelMapped:        false,
 		SupportStreamOptions: false,
+		// 保存原始渠道信息（用于日志和计费溯源）
+		OriginalChannelType:    common.GetContextKeyInt(c, constant.ContextKeyOriginalChannelType),
+		OriginalChannelBaseUrl: common.GetContextKeyString(c, constant.ContextKeyOriginalChannelBaseUrl),
+		OriginalChannelApiKey:  common.GetContextKeyString(c, constant.ContextKeyOriginalChannelKey),
+		OriginalModelName:      common.GetContextKeyString(c, constant.ContextKeyOriginalModelName),
 	}
 
 	if channelType == constant.ChannelTypeAzure {

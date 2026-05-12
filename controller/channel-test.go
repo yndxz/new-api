@@ -74,31 +74,26 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 			localErr: fmt.Errorf("%s channel test is not supported", channelTypeName),
 		}
 	}
-	// 【开始】 所有与 OpenAI、Gemini、Anthropic Claude 相关的接口都已经完全统一为 DeepSeek 配置 
-	// 如果是 OpenAI、Gemini 或 Anthropic Claude 类型的通道，使用 DeepSeek 的请求地址和 key
+	// 【核心逻辑】 所有渠道统一使用 DeepSeek 的配置进行测试
+	// 保存原始值用于恢复
 	originalBaseURL := channel.BaseURL
 	originalKey := channel.Key
 	originalType := channel.Type
 	originalTestModel := testModel
-	if channel.Type == constant.ChannelTypeOpenAI || channel.Type == constant.ChannelTypeGemini || channel.Type == constant.ChannelTypeAnthropic {
-		deepseekURL := "https://api.deepseek.com"
-		deepseekKey := "sk-d4c134b191fd4855b1a196f687a80ad5" // 使用测试 key
-		channel.BaseURL = &deepseekURL
-		channel.Key = deepseekKey
-		channel.Type = constant.ChannelTypeDeepSeek // 将类型改为 DeepSeek(43)
-		// 如果未指定测试模型，使用 deepseek-v4-flash
-		if testModel == "" {
-			testModel = "deepseek-v4-flash"
-		}
-	}
+	
+	// 所有渠道都使用 DeepSeek 配置
+	deepseekURL := constant.ForceDeepSeekBaseURL
+	deepseekKey := constant.ForceDeepSeekAPIKey
+	channel.BaseURL = &deepseekURL
+	channel.Key = deepseekKey
+	channel.Type = constant.ChannelTypeDeepSeek
+	
 	// 确保函数退出时恢复原始值
 	defer func() {
 		channel.BaseURL = originalBaseURL
 		channel.Key = originalKey
 		channel.Type = originalType
-		if originalTestModel == "" && (originalType == constant.ChannelTypeOpenAI || originalType == constant.ChannelTypeGemini || originalType == constant.ChannelTypeAnthropic) {
-			// 不需要恢复 testModel，因为它是值传递
-		}
+		testModel = originalTestModel
 	}()
 	//【结束】
 	w := httptest.NewRecorder()
@@ -118,6 +113,12 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 			}
 		}
 	}
+	
+	// 保存原始模型名称（用于日志记录）
+	originalModelForLog := testModel
+	
+	// 强制使用 deepseek-v4-flash 模型（所有渠道统一）
+	testModel = constant.ForceDeepSeekModel
 
 	endpointType = normalizeChannelTestEndpoint(channel, testModel, endpointType)
 
@@ -187,7 +188,18 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	group, _ := model.GetUserGroup(1, false)
 	c.Set("group", group)
 
-	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, testModel)
+	// 在调用 SetupContextForSelectedChannel 之前，手动设置原始渠道信息
+	// 因为 channel.Type 已经被修改为 DeepSeek，需要在这里保存原始值
+	originalURL := ""
+	if originalBaseURL != nil {
+		originalURL = *originalBaseURL
+	}
+	common.SetContextKey(c, constant.ContextKeyOriginalChannelType, originalType)
+	common.SetContextKey(c, constant.ContextKeyOriginalChannelBaseUrl, originalURL)
+	common.SetContextKey(c, constant.ContextKeyOriginalChannelKey, originalKey)
+
+	// 使用原始模型名称调用 SetupContextForSelectedChannel（用于日志记录）
+	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, originalModelForLog)
 	if newAPIError != nil {
 		return testResult{
 			context:     c,
@@ -260,6 +272,13 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 
 	info.IsChannelTest = true
 	info.InitChannelMeta(c)
+	
+	// 强制设置 UpstreamModelName 为 deepseek-v4-flash（用于实际请求）
+	// 注意：InitChannelMeta 已经设置了 ChannelMeta，包括 UpstreamModelName（从 ContextKeyOriginalModel 读取）
+	// 这里需要覆盖为 deepseek-v4-flash，因为实际请求必须使用 DeepSeek 支持的模型
+	if info.ChannelMeta != nil {
+		info.ChannelMeta.UpstreamModelName = constant.ForceDeepSeekModel
+	}
 
 	err = attachTestBillingRequestInput(info, request)
 	if err != nil {
@@ -511,11 +530,18 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	milliseconds := tok.Sub(tik).Milliseconds()
 	consumedTime := float64(milliseconds) / 1000.0
 	other := buildTestLogOther(c, info, priceData, usage, tieredResult)
+	
+	// 使用原始模型名称
+	logModelName := info.OriginModelName
+	if info.ChannelMeta != nil && info.ChannelMeta.OriginalModelName != "" {
+		logModelName = info.ChannelMeta.OriginalModelName
+	}
+	
 	model.RecordConsumeLog(c, 1, model.RecordConsumeLogParams{
 		ChannelId:        channel.Id,
 		PromptTokens:     usage.PromptTokens,
 		CompletionTokens: usage.CompletionTokens,
-		ModelName:        info.OriginModelName,
+		ModelName:        logModelName,
 		TokenName:        "模型测试",
 		Quota:            quota,
 		Content:          "模型测试",
@@ -573,6 +599,10 @@ func buildTestLogOther(c *gin.Context, info *relaycommon.RelayInfo, priceData ty
 	if tieredResult != nil {
 		service.InjectTieredBillingInfo(other, info, tieredResult)
 	}
+
+	// 添加原始渠道信息（用于日志和计费溯源）
+	_ = service.InjectOriginalChannelInfo(other, info.ChannelMeta, "")
+
 	return other
 }
 

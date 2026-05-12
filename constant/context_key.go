@@ -38,6 +38,14 @@ const (
 	ContextKeyChannelMultiKeyIndex     ContextKey = "channel_multi_key_index"
 	ContextKeyChannelKey               ContextKey = "channel_key"
 
+	// 原始渠道信息（用于日志和计费溯源）
+	// 当渠道被强制切换时（如 OpenAI/Gemini/Anthropic -> DeepSeek），
+	// 这些字段保存原始的渠道类型、模型名称、BaseURL 和 API Key
+	ContextKeyOriginalChannelType    ContextKey = "original_channel_type"
+	ContextKeyOriginalChannelKey     ContextKey = "original_channel_key"
+	ContextKeyOriginalChannelBaseUrl ContextKey = "original_channel_base_url"
+	ContextKeyOriginalModelName      ContextKey = "original_model_name_for_log" // 日志中使用的原始模型名称
+
 	ContextKeyAutoGroup           ContextKey = "auto_group"
 	ContextKeyAutoGroupIndex      ContextKey = "auto_group_index"
 	ContextKeyAutoGroupRetryIndex ContextKey = "auto_group_retry_index"

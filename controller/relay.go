@@ -195,28 +195,35 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError = channelErr
 			break
 		}
-		// 【开始】 所有与 OpenAI、Gemini、Anthropic Claude 相关的接口都已经完全统一为 DeepSeek 配置 
 		if channel == nil {
 			newAPIError = types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 			break
 		}
 
-		// 如果渠道类型是 OpenAI、Gemini 或 Anthropic，覆盖模型名称
+		// 【核心逻辑】 所有渠道统一使用 DeepSeek 模型
 		// 注意：渠道类型已经在 distributor 中改为 DeepSeek(43)，所以只需检查标记
-		if c.GetBool("force_deepseek_for_oai_gemini_anthropic") {
-			// 在 context 中设置模型名称
-			c.Set("original_model", "deepseek-v4-flash")
-			// 更新 retryParam 中的模型名称（用于重试）
-			retryParam.ModelName = "deepseek-v4-flash"
-			// 如果 relayInfo 不为 nil，也更新其中的模型名称
+		if c.GetBool("force_deepseek_for_all_channels") {
+			// 保存原始模型名称（用于日志记录）
+			originalModelName := ""
 			if relayInfo != nil {
-				relayInfo.OriginModelName = "deepseek-v4-flash"
+				originalModelName = relayInfo.OriginModelName
+			}
+			
+			// 在 context 中设置实际使用的模型名称（用于重试）
+			c.Set("original_model", constant.ForceDeepSeekModel)
+			// 更新 retryParam 中的模型名称（用于重试）
+			retryParam.ModelName = constant.ForceDeepSeekModel
+			// 如果 relayInfo 不为 nil，更新实际请求使用的模型名称
+			if relayInfo != nil {
+				// 注意：不要覆盖 OriginModelName，它用于日志记录原始模型
+				// 只更新 UpstreamModelName（用于实际请求）
 				if relayInfo.ChannelMeta != nil {
-					relayInfo.UpstreamModelName = "deepseek-v4-flash"
+					relayInfo.UpstreamModelName = constant.ForceDeepSeekModel
 				}
+				// 恢复原始模型名称（确保日志记录的是原始模型）
+				relayInfo.OriginModelName = originalModelName
 			}
 		}
-		//【结束】
 		addUsedChannel(c, channel.Id)
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
@@ -395,6 +402,16 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		if c.Request != nil && c.Request.URL != nil {
 			other["request_path"] = c.Request.URL.Path
 		}
+
+		// 添加原始渠道信息（用于日志和计费溯源）
+		originalChannelType := common.GetContextKeyInt(c, constant.ContextKeyOriginalChannelType)
+		if originalChannelType > 0 {
+			other["original_channel_type"] = originalChannelType
+			other["original_channel_type_name"] = constant.GetChannelTypeName(originalChannelType)
+			other["original_model_name"] = common.GetContextKeyString(c, constant.ContextKeyOriginalModelName)
+			other["original_base_url"] = common.GetContextKeyString(c, constant.ContextKeyOriginalChannelBaseUrl)
+		}
+
 		other["error_type"] = err.GetErrorType()
 		other["error_code"] = err.GetErrorCode()
 		other["status_code"] = err.StatusCode

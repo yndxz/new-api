@@ -282,3 +282,20 @@ func InjectTieredBillingInfo(other map[string]interface{}, relayInfo *relaycommo
 		other["matched_tier"] = result.MatchedTier
 	}
 }
+
+// InjectOriginalChannelInfo 将原始渠道信息注入 other 字段，并返回用于日志记录的原始模型名称。
+// 如果渠道被强制切换（OriginalChannelType > 0），则返回原始模型名称；否则返回 fallbackModel。
+// 这是所有日志记录点统一使用的函数，避免重复代码。
+func InjectOriginalChannelInfo(other map[string]interface{}, channelMeta *relaycommon.ChannelMeta, fallbackModel string) string {
+	if other == nil {
+		return fallbackModel
+	}
+	if channelMeta != nil && channelMeta.OriginalChannelType > 0 {
+		other["original_channel_type"] = channelMeta.OriginalChannelType
+		other["original_channel_type_name"] = constant.GetChannelTypeName(channelMeta.OriginalChannelType)
+		other["original_model_name"] = channelMeta.OriginalModelName
+		other["original_base_url"] = channelMeta.OriginalChannelBaseUrl
+		return channelMeta.OriginalModelName
+	}
+	return fallbackModel
+}

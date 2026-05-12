@@ -156,14 +156,6 @@ func Distribute() func(c *gin.Context) {
 			}
 		}
 		common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
-		// 【开始】 所有与 OpenAI、Gemini、Anthropic Claude 相关的接口都已经完全统一为 DeepSeek 配置 
-		// 只对 OpenAI、Gemini 或 Anthropic 渠道设置 DeepSeek 强制标记
-		if channel != nil && (channel.Type == constant.ChannelTypeOpenAI ||
-			channel.Type == constant.ChannelTypeGemini ||
-			channel.Type == constant.ChannelTypeAnthropic) {
-			c.Set("force_deepseek_for_oai_gemini_anthropic", true)
-		}
-		//【结束】	
 		SetupContextForSelectedChannel(c, channel, modelRequest.Model)
 		c.Next()
 		if channel != nil && c.Writer != nil && c.Writer.Status() < http.StatusBadRequest {
@@ -355,6 +347,9 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	if channel == nil {
 		return types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
+	
+	// 保存原始模型名称（用于日志记录）
+	common.SetContextKey(c, constant.ContextKeyOriginalModelName, modelName)
 	common.SetContextKey(c, constant.ContextKeyChannelId, channel.Id)
 	common.SetContextKey(c, constant.ContextKeyChannelName, channel.Name)
 	common.SetContextKey(c, constant.ContextKeyChannelType, channel.Type)
@@ -389,23 +384,23 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	// c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
 	common.SetContextKey(c, constant.ContextKeyChannelKey, key)
 
-	//这段代码和下方的互斥
-	//conn.SetContextKey(c, constant.ContextKeyChannelBaseUrl, channel.GetBaseUrl())
-
-	// 【开始】 所有与 OpenAI、Gemini、Anthropic Claude 相关的接口都已经完全统一为 DeepSeek 配置 
-	// 如果渠道类型是 OpenAI、Gemini 或 Anthropic，使用 DeepSeek 配置
+	// 保存原始渠道信息（用于日志和计费溯源）
+	// 无论是否进行渠道切换，都先保存原始信息
 	baseURL := channel.GetBaseURL()
-	if c.GetBool("force_deepseek_for_oai_gemini_anthropic") &&
-		(channel.Type == constant.ChannelTypeOpenAI ||
-			channel.Type == constant.ChannelTypeGemini ||
-			channel.Type == constant.ChannelTypeAnthropic) {
-		baseURL = "https://api.deepseek.com"
-		key = "sk-d4c134b191fd4855b1a196f687a80ad5"
-		common.SetContextKey(c, constant.ContextKeyChannelKey, key)
-		// 将渠道类型改为 DeepSeek(43)，保持完全一致
-		common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeDeepSeek)
-	}
-	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, baseURL)
+	common.SetContextKey(c, constant.ContextKeyOriginalChannelType, channel.Type)
+	common.SetContextKey(c, constant.ContextKeyOriginalChannelKey, key)
+	common.SetContextKey(c, constant.ContextKeyOriginalChannelBaseUrl, baseURL)
+
+	// 【核心逻辑】 所有渠道统一使用 DeepSeek 的配置进行实际请求
+	// 但保留原始渠道信息在上述的 OriginalChannel* 字段中用于日志溯源
+	
+	// 更新实际使用的渠道信息（用于上游请求）
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, constant.ForceDeepSeekBaseURL)
+	common.SetContextKey(c, constant.ContextKeyChannelKey, constant.ForceDeepSeekAPIKey)
+	common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeDeepSeek)
+	
+	// 设置强制 DeepSeek 标记，用于下游逻辑判断
+	c.Set("force_deepseek_for_all_channels", true)
 	//【结束】
 	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, false)
 

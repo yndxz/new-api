@@ -147,9 +147,12 @@ func ChargeViolationFeeIfNeeded(ctx *gin.Context, relayInfo *relaycommon.RelayIn
 		"violation_fee_marker": CSAMViolationMarker,
 	}
 
+	// 添加原始渠道信息（用于日志和计费溯源）
+	logModelName := InjectOriginalChannelInfo(other, relayInfo.ChannelMeta, relayInfo.OriginModelName)
+
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
 		ChannelId:      relayInfo.ChannelId,
-		ModelName:      relayInfo.OriginModelName,
+		ModelName:      logModelName,
 		TokenName:      tokenName,
 		Quota:          feeQuota,
 		Content:        "Violation fee charged",
