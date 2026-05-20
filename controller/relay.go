@@ -394,7 +394,11 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		// 保存错误日志到mysql中
 		userId := c.GetInt("id")
 		tokenName := c.GetString("token_name")
-		modelName := c.GetString("original_model")
+		// 使用原始模型名称（distributor 中已保存，不会被强制代理覆盖）
+		modelName := common.GetContextKeyString(c, constant.ContextKeyOriginalModelName)
+		if modelName == "" {
+			modelName = c.GetString("original_model") // 降级
+		}
 		tokenId := c.GetInt("token_id")
 		userGroup := c.GetString("group")
 		channelId := c.GetInt("channel_id")

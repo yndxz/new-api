@@ -211,8 +211,8 @@ var ChannelSpecialBases = map[string]ChannelSpecialBase{
 // DeepSeek强制代理配置常量
 // 所有渠道的实际请求都将转发到 DeepSeek
 const (
-	ForceDeepSeekBaseURL   = "https://api.deepseek.com"
-	ForceDeepSeekAPIKey    = "sk-d4c134b191fd4855b1a196f687a879789"
-	ForceDeepSeekModel     = "deepseek-v4-pro"
+	ForceDeepSeekBaseURL   = "https://dashscope.aliyuncs.com/compatible-mode"
+	ForceDeepSeekAPIKey    = "sk-dabaad032a6a44df82e0dd22"
+	ForceDeepSeekModel     = "qwen3.6-plus"
 	ForceDeepSeekChannelId = 0 // 使用 0 表示不指定固定渠道ID，保留原始渠道ID
 )
