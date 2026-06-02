@@ -21,7 +21,7 @@ import (
 
 // alipayPublicKey 支付宝公钥，部署时请替换为您的支付宝公钥
 // 从支付宝开放平台 → 开发设置 → 支付宝公钥 获取（注意：不是应用公钥，是支付宝公钥）
-const alipayPublicKey = `/mh3ViqRqxoMpIpbKaRvEyzmbO3ikTw6RTdwdx6XQUrN68FiSXEPafYGJtBslsm0s+ngGGy3eQQuBKMtPzqnn7mwduUMX9nNZc/vFlZ0gOb6XNrh5HmvXQUeDw96rLeT/2N8J71W6WdztFNRgYRR3DXFbnb4sfOtMDmMtOQbirEiy8PHYUsbmR1+nMAhjhg8DdKdp+tsEdooeHO5rcz+/wVZv7W4QAMbyZKcd8RqIkUUk9bbB8UMKwDm/BYoZgdH8l3oW/JO1j1ffirPaFN137d5KKRIUVBZuL+by4qU/2B0AMl/5a54kjJq6hDS9FLS8BtlpQIDAQAB`
+const alipayPublicKey = `MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjgMbMJpFwP7mmXT9/mh3ViqRqxoMpIpbKaRvEyzmbO3ikTw6RTdwdx6XQUrN68FiSXEPafYGJtBslsm0s+ngGGy3eQQuBKMtPzqnn7mwduUMX9nNZc/vFlZ0gOb6XNrh5HmvXQUeDw96rLeT/2N8J71W6WdztFNRgYRR3DXFbnb4sfOtMDmMtOQbirEiy8PHYUsbmR1+nMAhjhg8DdKdp+tsEdooeHO5rcz+/wVZv7W4QAMbyZKcd8RqIkUUk9bbB8UMKwDm/BYoZgdH8l3oW/JO1j1ffirPaFN137d5KKRIUVBZuL+by4qU/2B0AMl/5a54kjJq6hDS9FLS8BtlpQIDAQAB`
 
 // verifyAlipaySign 使用硬编码的支付宝公钥进行 RSA2 验签
 func verifyAlipaySign(params map[string]string) (bool, error) {
