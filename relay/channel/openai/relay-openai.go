@@ -275,6 +275,11 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 
 	applyUsagePostProcessing(info, &simpleResponse.Usage, responseBody)
 
+	// 统一修复 Model 字段为客户端原始模型名，确保后续格式转换函数获得正确的模型名
+	if info.OriginModelName != "" {
+		simpleResponse.Model = info.OriginModelName
+	}
+
 	switch info.RelayFormat {
 	case types.RelayFormatOpenAI:
 		if usageModified {
@@ -311,8 +316,10 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	}
 
 	// 响应 Model 字段使用客户端原始模型名
-	if info.OriginModelName != "" && info.RelayFormat == types.RelayFormatOpenAI {
-		responseBody, _ = sjson.SetBytes(responseBody, "model", info.OriginModelName)
+	if info.OriginModelName != "" {
+		if info.RelayFormat == types.RelayFormatOpenAI {
+			responseBody, _ = sjson.SetBytes(responseBody, "model", info.OriginModelName)
+		}
 	}
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)
