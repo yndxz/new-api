@@ -182,11 +182,11 @@ func requestOpenAI2Dify(c *gin.Context, info *relaycommon.RelayInfo, request dto
 	return &difyReq
 }
 
-func streamResponseDify2OpenAI(difyResponse DifyChunkChatCompletionResponse) *dto.ChatCompletionsStreamResponse {
+func streamResponseDify2OpenAI(difyResponse DifyChunkChatCompletionResponse, modelName string) *dto.ChatCompletionsStreamResponse {
 	response := dto.ChatCompletionsStreamResponse{
 		Object:  "chat.completion.chunk",
 		Created: common.GetTimestamp(),
-		Model:   "dify",
+		Model:   modelName,
 	}
 	var choice dto.ChatCompletionsStreamResponseChoice
 	if strings.HasPrefix(difyResponse.Event, "workflow_") {
@@ -238,7 +238,11 @@ func difyStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 			sr.Stop(fmt.Errorf("dify error event"))
 			return
 		}
-		openaiResponse := *streamResponseDify2OpenAI(difyResponse)
+		modelName := info.OriginModelName
+		if modelName == "" {
+			modelName = info.UpstreamModelName
+		}
+		openaiResponse := *streamResponseDify2OpenAI(difyResponse, modelName)
 		if len(openaiResponse.Choices) != 0 {
 			responseText += openaiResponse.Choices[0].Delta.GetContentString()
 			if openaiResponse.Choices[0].Delta.ReasoningContent != nil {
@@ -270,10 +274,15 @@ func difyHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respons
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
+	modelName := info.OriginModelName
+	if modelName == "" {
+		modelName = info.UpstreamModelName
+	}
 	fullTextResponse := dto.OpenAITextResponse{
 		Id:      difyResponse.ConversationId,
 		Object:  "chat.completion",
 		Created: common.GetTimestamp(),
+		Model:   modelName,
 		Usage:   difyResponse.MetaData.Usage,
 	}
 	choice := dto.OpenAITextResponseChoice{

@@ -38,6 +38,11 @@ func handleClaudeFormat(c *gin.Context, data string, info *relaycommon.RelayInfo
 		return err
 	}
 
+	// 修复 Model 字段为客户端原始模型名，SteamResponseOpenAI2Claude 会将其写入 message_start 事件
+	if info.OriginModelName != "" {
+		streamResponse.Model = info.OriginModelName
+	}
+
 	if streamResponse.Usage != nil {
 		info.ClaudeConvertInfo.Usage = streamResponse.Usage
 	}

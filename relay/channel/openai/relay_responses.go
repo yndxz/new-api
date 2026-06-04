@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/tidwall/sjson"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,6 +39,11 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		c.Set("image_generation_call", true)
 		c.Set("image_generation_call_quality", responsesResponse.GetQuality())
 		c.Set("image_generation_call_size", responsesResponse.GetSize())
+	}
+
+	// 响应 Model 字段使用客户端原始模型名
+	if info != nil && info.OriginModelName != "" {
+		responseBody, _ = sjson.SetBytes(responseBody, "model", info.OriginModelName)
 	}
 
 	// 写入新的 response body
@@ -87,6 +93,13 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			logger.LogError(c, "failed to unmarshal stream response: "+err.Error())
 			sr.Error(err)
 			return
+		}
+		// 响应 Model 字段使用客户端原始模型名
+		if info != nil && info.OriginModelName != "" && streamResponse.Response != nil && streamResponse.Response.Model != "" {
+			modifiedData, err := sjson.Set(data, "response.model", info.OriginModelName)
+			if err == nil {
+				data = modifiedData
+			}
 		}
 		sendResponsesStreamData(c, streamResponse, data)
 		switch streamResponse.Type {

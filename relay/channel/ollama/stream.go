@@ -72,7 +72,10 @@ func ollamaStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	helper.SetEventStreamHeaders(c)
 	scanner := bufio.NewScanner(resp.Body)
 	usage := &dto.Usage{}
-	var model = info.UpstreamModelName
+	var model = info.OriginModelName
+	if model == "" {
+		model = info.UpstreamModelName
+	}
 	var responseId = common.GetUUID()
 	var created = time.Now().Unix()
 	var toolCallIndex int
@@ -93,7 +96,7 @@ func ollamaStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			return usage, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 		}
 		if chunk.Model != "" {
-			model = chunk.Model
+			_ = chunk.Model // use upstream model name if available
 		}
 		created = toUnix(chunk.CreatedAt)
 
@@ -261,7 +264,10 @@ func ollamaChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 
 	model := lastChunk.Model
 	if model == "" {
-		model = info.UpstreamModelName
+		model = info.OriginModelName
+		if model == "" {
+			model = info.UpstreamModelName
+		}
 	}
 	created := toUnix(lastChunk.CreatedAt)
 	usage := &dto.Usage{PromptTokens: lastChunk.PromptEvalCount, CompletionTokens: lastChunk.EvalCount, TotalTokens: lastChunk.PromptEvalCount + lastChunk.EvalCount}

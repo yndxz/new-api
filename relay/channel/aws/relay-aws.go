@@ -235,9 +235,12 @@ func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types
 	claudeInfo := &claude.ClaudeResponseInfo{
 		ResponseId:   helper.GetResponseID(c),
 		Created:      common.GetTimestamp(),
-		Model:        info.UpstreamModelName,
+		Model:        info.OriginModelName,
 		ResponseText: strings.Builder{},
 		Usage:        &dto.Usage{},
+	}
+	if claudeInfo.Model == "" {
+		claudeInfo.Model = info.UpstreamModelName
 	}
 
 	// 复制上游 Content-Type 到客户端响应头
@@ -267,9 +270,12 @@ func awsStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (
 	claudeInfo := &claude.ClaudeResponseInfo{
 		ResponseId:   helper.GetResponseID(c),
 		Created:      common.GetTimestamp(),
-		Model:        info.UpstreamModelName,
+		Model:        info.OriginModelName,
 		ResponseText: strings.Builder{},
 		Usage:        &dto.Usage{},
+	}
+	if claudeInfo.Model == "" {
+		claudeInfo.Model = info.UpstreamModelName
 	}
 
 	for event := range stream.Events() {
@@ -330,7 +336,7 @@ func handleNovaRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) 
 		Id:      helper.GetResponseID(c),
 		Object:  "chat.completion",
 		Created: common.GetTimestamp(),
-		Model:   info.UpstreamModelName,
+		Model:   info.OriginModelName,
 		Choices: []dto.OpenAITextResponseChoice{{
 			Index: 0,
 			Message: dto.Message{

@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 
 	"github.com/QuantumNous/new-api/types"
+	"github.com/tidwall/sjson"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
@@ -28,12 +29,23 @@ func sendStreamData(c *gin.Context, info *relaycommon.RelayInfo, data string, fo
 	}
 
 	if !forceFormat && !thinkToContent {
+		// Override model to original client model name
+		if info.OriginModelName != "" {
+			if modifiedData, err := sjson.Set(data, "model", info.OriginModelName); err == nil {
+				data = modifiedData
+			}
+		}
 		return helper.StringData(c, data)
 	}
 
 	var lastStreamResponse dto.ChatCompletionsStreamResponse
 	if err := common.UnmarshalJsonStr(data, &lastStreamResponse); err != nil {
 		return err
+	}
+
+	// 统一修复 Model 字段为客户端原始模型名
+	if info.OriginModelName != "" {
+		lastStreamResponse.Model = info.OriginModelName
 	}
 
 	if !thinkToContent {
@@ -111,7 +123,10 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	defer service.CloseResponseBodyGracefully(resp)
 
-	model := info.UpstreamModelName
+	model := info.OriginModelName
+	if model == "" {
+		model = info.UpstreamModelName
+	}
 	var responseId string
 	var createAt int64 = 0
 	var systemFingerprint string
@@ -169,6 +184,12 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	if err := handleLastResponse(lastStreamData, &responseId, &createAt, &systemFingerprint, &model, &usage,
 		&containStreamUsage, info, &shouldSendLastResp); err != nil {
 		logger.LogError(c, fmt.Sprintf("error handling last response: %s, lastStreamData: [%s]", err.Error(), lastStreamData))
+	}
+
+	// handleLastResponse 内部会覆写 model 为上游 SSE 中的模型名，需恢复为客户端原始模型名
+	model = info.OriginModelName
+	if model == "" {
+		model = info.UpstreamModelName
 	}
 
 	if info.RelayFormat == types.RelayFormatOpenAI {
@@ -287,6 +308,11 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 			return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 		}
 		responseBody = geminiRespStr
+	}
+
+	// 响应 Model 字段使用客户端原始模型名
+	if info.OriginModelName != "" && info.RelayFormat == types.RelayFormatOpenAI {
+		responseBody, _ = sjson.SetBytes(responseBody, "model", info.OriginModelName)
 	}
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)

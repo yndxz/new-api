@@ -35,11 +35,11 @@ func embeddingRequestOpenAI2Moka(request dto.GeneralOpenAIRequest) *dto.Embeddin
 	}
 }
 
-func embeddingResponseMoka2OpenAI(response *dto.EmbeddingResponse) *dto.OpenAIEmbeddingResponse {
+func embeddingResponseMoka2OpenAI(response *dto.EmbeddingResponse, modelName string) *dto.OpenAIEmbeddingResponse {
 	openAIEmbeddingResponse := dto.OpenAIEmbeddingResponse{
 		Object: "list",
 		Data:   make([]dto.OpenAIEmbeddingResponseItem, 0, len(response.Data)),
-		Model:  "baidu-embedding",
+		Model:  modelName,
 		Usage:  response.Usage,
 	}
 	for _, item := range response.Data {
@@ -72,7 +72,7 @@ func mokaEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *htt
 	// 		StatusCode: resp.StatusCode,
 	// 	}, nil
 	// }
-	fullTextResponse := embeddingResponseMoka2OpenAI(&baiduResponse)
+	fullTextResponse := embeddingResponseMoka2OpenAI(&baiduResponse, info.OriginModelName)
 	jsonResponse, err := common.Marshal(fullTextResponse)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
